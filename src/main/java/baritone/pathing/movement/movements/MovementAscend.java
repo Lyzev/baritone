@@ -112,7 +112,7 @@ public class MovementAscend extends Movement {
             // and in that scenario, when we arrive and break srcUp2, that lets srcUp3 fall on us and suffocate us
         }
         BlockState srcDown = context.get(x, y - 1, z);
-        if (MovementHelper.isClimbable(srcDown.getBlock())) {
+        if (MovementHelper.isClimbable(srcDown.getBlock()) && (!(srcDown.getBlock() == Blocks.LADDER /* we can only jump from the top of a ladder */) || MovementHelper.isClimbable(context.get(x, y + 1, z).getBlock()))) {
             return COST_INF;
         }
         // we can jump from soul sand, but not from a bottom slab
