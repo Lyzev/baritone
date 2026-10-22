@@ -58,8 +58,9 @@ public class MovementPillar extends Movement {
     public static double cost(CalculationContext context, int x, int y, int z) {
         BlockState fromState = context.get(x, y, z);
         Block from = fromState.getBlock();
-        boolean ladder = MovementHelper.isClimbable(from);
+        BlockState srcUp = context.get(x, y + 1, z);
         BlockState fromDown = context.get(x, y - 1, z);
+        boolean ladder = MovementHelper.isClimbable(from) || (!MovementHelper.isClimbable(fromDown.getBlock()) && MovementHelper.isClimbable(srcUp.getBlock()));
         if (!ladder) {
             if (MovementHelper.isClimbable(fromDown.getBlock())) {
                 return COST_INF; // can't pillar from a ladder or vine onto something that isn't also climbable
@@ -73,9 +74,7 @@ public class MovementPillar extends Movement {
         if (toBreakBlock instanceof FenceGateBlock) { // see issue #172
             return COST_INF;
         }
-        BlockState srcUp = null;
         if (MovementHelper.isWater(toBreak) && MovementHelper.isWater(fromState)) { // TODO should this also be allowed if toBreakBlock is air?
-            srcUp = context.get(x, y + 1, z);
             if (MovementHelper.isWater(srcUp)) {
                 return LADDER_UP_ONE_COST; // allow ascending pillars of water, but only if we're already in one
             }
@@ -91,7 +90,7 @@ public class MovementPillar extends Movement {
                 placeCost += 0.1; // slightly (1/200th of a second) penalize pillaring on what's currently air
             }
         }
-        if ((MovementHelper.isLiquid(fromState) && !MovementHelper.canPlaceAgainst(context, x, y - 1, z, fromDown)) || (MovementHelper.isLiquid(fromDown) && !MovementHelper.isWaterloggedSolidTop(fromDown) && context.assumeWalkOnWater)) {
+        if (!ladder && ((MovementHelper.isLiquid(fromState) && !MovementHelper.canPlaceAgainst(context, x, y - 1, z, fromDown)) || (MovementHelper.isLiquid(fromDown) && !MovementHelper.isWaterloggedSolidTop(fromDown) && context.assumeWalkOnWater))) {
             // otherwise, if we're standing in water, we cannot pillar
             // if we're standing on water and assumeWalkOnWater is true, we cannot pillar
             // if we're standing on water and assumeWalkOnWater is false, we must have ascended to here, or sneak backplaced, so it is possible to pillar again
@@ -112,9 +111,6 @@ public class MovementPillar extends Movement {
                 BlockState check = context.get(x, y + 3, z); // the block on top of the one we're going to break, could it fall on us?
                 if (check.getBlock() instanceof FallingBlock) {
                     // see MovementAscend's identical check for breaking a falling block above our head
-                    if (srcUp == null) {
-                        srcUp = context.get(x, y + 1, z);
-                    }
                     if (!(toBreakBlock instanceof FallingBlock) || !(srcUp.getBlock() instanceof FallingBlock)) {
                         return COST_INF;
                     }
@@ -147,7 +143,8 @@ public class MovementPillar extends Movement {
         }
 
         BlockState fromDown = BlockStateInterface.get(ctx, src);
-        if (MovementHelper.isWater(fromDown) && MovementHelper.isWater(ctx, dest)) {
+        BlockState destState = BlockStateInterface.get(ctx, dest);
+        if (MovementHelper.isWater(fromDown) && MovementHelper.isWater(destState)) {
             // stay centered while swimming up a water column
             state.setTarget(new MovementState.MovementTarget(RotationUtils.calcRotationFromVec3d(ctx.playerHead(), VecUtils.getBlockPosCenter(dest), ctx.playerRotations()), false));
             Vec3 destCenter = VecUtils.getBlockPosCenter(dest);
@@ -159,7 +156,7 @@ public class MovementPillar extends Movement {
             }
             return state;
         }
-        boolean ladder = MovementHelper.isClimbable(fromDown.getBlock());
+        boolean ladder = MovementHelper.isClimbable(fromDown.getBlock()) || MovementHelper.isClimbable(destState.getBlock());
 
         Rotation rotation = RotationUtils.calcRotationFromVec3d(ctx.playerHead(),
                 VecUtils.getBlockPosCenter(positionToPlace),
